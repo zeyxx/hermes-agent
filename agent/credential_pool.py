@@ -2528,7 +2528,40 @@ _ANTHROPIC_SOURCE_RANK = {
 
 def _normalize_pool_priorities(provider: str, entries: list[PooledCredential]) -> bool:
     if provider != "anthropic":
-        return False
+        # A plugin profile can declare ``env_sources_last`` when its env vars are a
+        # fallback (e.g. direct API keys) and must not outrank provider-owned OAuth rows.
+        from hermes_cli.auth_plugin_providers import PLUGIN_MIRRORED_PROVIDERS, plugin_profile
+
+        if provider not in PLUGIN_MIRRORED_PROVIDERS:
+            return False
+
+        profile = plugin_profile(provider)
+        if not getattr(profile, "env_sources_last", False):
+            return False
+        manual_entries = sorted(
+            (entry for entry in entries if _is_manual_source(entry.source)),
+            key=lambda entry: entry.priority,
+        )
+        env_entries = sorted(
+            (entry for entry in entries if entry.source.startswith("env:")),
+            key=lambda entry: entry.priority,
+        )
+        other_entries = sorted(
+            (
+                entry for entry in entries
+                if not _is_manual_source(entry.source) and not entry.source.startswith("env:")
+            ),
+            key=lambda entry: entry.priority,
+        )
+        ordered = [*manual_entries, *other_entries, *env_entries]
+        id_to_idx = {entry.id: idx for idx, entry in enumerate(entries)}
+        changed = False
+        for new_priority, entry in enumerate(ordered):
+            if entry.priority != new_priority:
+                entries[id_to_idx[entry.id]] = replace(entry, priority=new_priority)
+                changed = True
+        return changed
+
     manual_entries = sorted(
         (entry for entry in entries if _is_manual_source(entry.source)),
         key=lambda entry: entry.priority,

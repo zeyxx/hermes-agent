@@ -80,6 +80,10 @@ class ProviderProfile:
     auth_handler: Callable[[str, Any], Any] | None = None
     refresh_credential: Callable[[Any], Any] | None = None
     classify_api_error: Callable[..., Any] | None = None
+    # True when this provider's env vars are a fallback credential (e.g. a direct API key) and must
+    # not outrank provider-owned OAuth rows in the credential pool. The pool sorts manual/OAuth
+    # entries first and env-backed entries last for such providers.
+    env_sources_last: bool = False
 
     # ── Vision support ────────────────────────────────────────
     # True when the provider's API accepts image content inside
