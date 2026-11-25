@@ -32,7 +32,7 @@ jobs:
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
 
       - name: Install locked test environment
-        run: uv sync --locked --python 3.14 --group dev
+        run: uv sync --locked --python 3.14 --group dev --extra sms
 
       - name: Run API server tests in isolated home
         env:
@@ -42,5 +42,5 @@ jobs:
           HERMES_HOME: ${{ runner.temp }}/hermes-smoke-home
         run: |
           mkdir -p "$HERMES_HOME"
-          uv run --locked --python 3.14 --group dev --no-sync \
+          uv run --locked --python 3.14 --group dev --extra sms --no-sync \
             python -B -m pytest -q tests/gateway/test_api_server.py --disable-warnings --tb=short
