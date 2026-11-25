@@ -1000,6 +1000,29 @@ class TestSkillsEndpoint:
                     assert set(entry.keys()) >= {"name", "description", "category"}
 
 
+    def test_skills_route_respects_real_discovery_signature(self, adapter):
+        """Regression: mocks with **kwargs hid an unsupported include_editorial keyword."""
+        calls = []
+
+        def strict_find_all_skills(*, skip_disabled=False):
+            calls.append(skip_disabled)
+            return [{"name": "sample", "description": "A skill", "category": "test"}]
+
+        async def check_endpoint():
+            with patch("tools.skills_tool.find_all_skills", side_effect=strict_find_all_skills):
+                app = _create_app(adapter)
+                async with TestClient(TestServer(app)) as cli:
+                    resp = await cli.get("/v1/skills")
+                    assert resp.status == 200
+                    data = await resp.json()
+                    assert data == {"object": "list", "data": [
+                        {"name": "sample", "description": "A skill", "category": "test"}
+                    ]}
+
+        asyncio.run(check_endpoint())
+        assert calls == [False]
+
+
 class TestToolsetsEndpoint:
     @pytest.mark.asyncio
     async def test_toolsets_returns_resolved_tools(self, adapter):
