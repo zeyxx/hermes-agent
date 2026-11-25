@@ -1,0 +1,46 @@
+# Fork-only safety net; full upstream Docker/Nix release CI needs Blacksmith runners.
+name: Fork API smoke
+
+on:
+  pull_request:
+    paths:
+      - "gateway/platforms/api_server.py"
+      - "tools/skills_tool.py"
+      - "tests/gateway/test_api_server.py"
+      - ".github/workflows/fork-api-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-api-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    if: github.repository == 'zeyxx/hermes-agent'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+
+      - name: Install locked test environment
+        run: uv sync --locked --python 3.14 --group dev --extra sms
+
+      - name: Run API server tests in isolated home
+        env:
+          OPENAI_API_KEY: ""
+          OPENROUTER_API_KEY: ""
+          NOUS_API_KEY: ""
+          HERMES_HOME: ${{ runner.temp }}/hermes-smoke-home
+        run: |
+          mkdir -p "$HERMES_HOME"
+          uv run --locked --python 3.14 --group dev --extra sms --no-sync \
+            python -B -m pytest -q tests/gateway/test_api_server.py --disable-warnings --tb=short
